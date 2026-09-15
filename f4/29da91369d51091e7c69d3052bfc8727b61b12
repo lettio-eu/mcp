@@ -1,0 +1,21 @@
+Dockerfile
+  s_8b24abc61851be::t_48bba9a5aca50d 1-18
+.dockerignore
+  s_8b24abc61851be::t_3b274f937b3426 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f429da91369d51091e7c69d3052bfc8727b61b12",
+  "prompts": {},
+  "sessions": {
+    "s_8b24abc61851be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4df71cb9-51c4-4ec8-818d-61c03e4f3a6f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "mabezdek <ma.bezdek@gmail.com>"
+    }
+  }
+}
