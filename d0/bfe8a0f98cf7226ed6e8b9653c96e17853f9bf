@@ -1,0 +1,19 @@
+glama.json
+  s_8b24abc61851be::t_cb32aa15b0f380 1-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d0bfe8a0f98cf7226ed6e8b9653c96e17853f9bf",
+  "prompts": {},
+  "sessions": {
+    "s_8b24abc61851be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4df71cb9-51c4-4ec8-818d-61c03e4f3a6f",
+        "model": "unknown"
+      },
+      "human_author": "mabezdek <ma.bezdek@gmail.com>"
+    }
+  }
+}
