@@ -1,0 +1,48 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.lettio-eu/mcp",
+  "title": "Lettio MCP",
+  "description": "Private, EU-hosted email for AI agents over the open JMAP standard. Read, search, reply in-thread, organize and send from your own mailbox; sending is pinned to the signed-in mailbox.",
+  "version": "0.1.1",
+  "repository": {
+    "url": "https://github.com/lettio-eu/mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@lettio/mcp",
+      "version": "0.1.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "LETTIO_USERNAME",
+          "description": "Full email address of the Lettio mailbox, e.g. you@yourcompany.eu.",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "LETTIO_PASSWORD",
+          "description": "App password for the mailbox.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "LETTIO_HOST",
+          "description": "Mail host. Defaults to https://mail.lettio.eu.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.lettio.eu/mcp"
+    }
+  ]
+}
