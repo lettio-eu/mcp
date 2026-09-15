@@ -1,0 +1,21 @@
+package.json
+  s_8b24abc61851be::t_7c3bef12a0addc 4
+server.json
+  s_8b24abc61851be::t_23c9d4b84e631c 1-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c86f06b06915c29714747fe165c7ec84a0ffa51f",
+  "prompts": {},
+  "sessions": {
+    "s_8b24abc61851be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4df71cb9-51c4-4ec8-818d-61c03e4f3a6f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "mabezdek <ma.bezdek@gmail.com>"
+    }
+  }
+}
