@@ -1,7 +1,7 @@
 {
   "name": "@lettio/mcp",
-  "version": "0.1.1",
-  "mcpName": "io.github.lettio-eu/mcp",
+  "version": "0.1.2",
+  "mcpName": "eu.lettio/mcp",
   "publishConfig": {
     "access": "public"
   },
