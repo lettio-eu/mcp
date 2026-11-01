@@ -5,7 +5,7 @@
 Lettio MCP is a [Model Context Protocol](https://modelcontextprotocol.io) server that connects
 an AI agent (Claude, Cursor, and any other MCP client) to a [Lettio](https://lettio.eu)
 mailbox over [JMAP](https://jmap.io). Your assistant can triage your inbox, find a message,
-and send a reply — without your email ever leaving Europe.
+and send a reply.
 
 - 🇪🇺 **European by default** — talks to your own EU-hosted mailbox, no third‑party middleman.
 - 🔒 **Safe sending** — the server can only ever send *as the mailbox it is signed in to*. It
@@ -21,16 +21,28 @@ and send a reply — without your email ever leaving Europe.
 
 | Tool | What it does |
 |------|--------------|
-| `list_accounts` | List the mailboxes this server is configured for. |
-| `list_mailboxes` | List folders in an account, with message and unread counts. |
-| `list_recent_emails` | Most recent messages in a mailbox (defaults to the inbox). |
-| `search_emails` | Free‑text search across sender, subject and body. |
-| `read_email` | Full content of one message by id. |
-| `send_email` | Send a plain‑text email **as the signed‑in mailbox**. |
-| `reply_email` | Reply in‑thread (keeps the conversation), optionally reply‑all. |
-| `set_read_status` | Mark a message read or unread. |
-| `flag_email` | Flag (star) or unflag a message. |
-| `move_email` | Move to a folder — `archive`, `trash` (reversible), or a folder name. |
+| `whoami` | Show the connected mailbox and whether it may send. |
+| `list_accounts` | List configured mailboxes (local server). |
+| `list_mailboxes` | List folders with message and unread counts. |
+| `list_recent_emails` | Latest messages in a folder, with paging. |
+| `search_emails` | Free text plus filters: sender, recipient, subject, dates, attachments, unread, folder. |
+| `read_email` | One message as text, with its attachments listed. HTML mail is converted. |
+| `get_thread` | A whole conversation, oldest first. |
+| `get_attachment` | Open an attachment: text and PDF as text, images as images, others as binary. Locally it can also save to a file. |
+| `send_email` | Send formatted mail **as the signed-in mailbox**, with attachments. |
+| `reply_email` | Reply in-thread, optionally to everyone, with attachments. |
+| `create_draft` | Save a message to Drafts without sending. |
+| `create_reply_draft` | Save a threaded reply to Drafts without sending. |
+| `send_draft` | Send a draft that is already in Drafts. |
+| `set_read_status` | Mark messages read or unread. |
+| `flag_email` | Flag or unflag messages. |
+| `label_email` | Add or remove a label. |
+| `move_email` | Move to a folder, `archive`, or `trash` (reversible). |
+| `create_folder` | Create a mail folder. |
+
+Messages are written in Markdown and go out as HTML with a plain-text version. Pass `format: "plain"` to send text as written. Bulk tools take up to 100 ids.
+
+Attachments can be base64 content, a local `path`, or `from_email_id` with `attachment_id` to reuse a file from another message.
 
 ## Requirements
 
