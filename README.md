@@ -17,6 +17,18 @@ and send a reply.
 > `https://mcp.lettio.eu/mcp` — add that URL in your client and sign in. This npm package is the
 > **local / self‑hosted** option for people who want to run it on their own machine.
 
+## Hosted server: mail cards in Claude
+
+The hosted server at `https://mcp.lettio.eu/mcp` adds three tools that open interactive cards in clients that support [MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview), such as Claude:
+
+- `show_emails`: the inbox, a folder or search results as a list you can open, archive and flag
+- `show_email`: a whole conversation, with Reply, Reply all, Archive and Trash
+- `preview_email`: a drafted message you can edit, preview in your brand and send
+
+Sending from a card always needs your click, even when the connection doesn't allow the agent to send on its own. One connection can cover up to 10 mailboxes; searches run across all of them.
+
+![Lettio mail cards in Claude](https://lettio.eu/images/mcp/card-reply.jpg)
+
 ## Tools
 
 | Tool | What it does |
