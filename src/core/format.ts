@@ -54,6 +54,11 @@ function theme(b: Brand) {
   };
 }
 
+/** A hairline that reads in light and dark mode. Outlook keeps the solid fallback colour. */
+function hairline(side: "border" | "border-top", solid: string): string {
+  return `${side}:1px solid ${solid};${side}-color:rgba(128,128,140,0.28)`;
+}
+
 function emailMarked(b: Brand): Marked {
   const t = theme(b);
   const font = (size: string, weight = 400, extra = "") => `font-family:${t.font};font-size:${size};font-weight:${weight};${extra}`;
@@ -105,7 +110,7 @@ function emailMarked(b: Brand): Marked {
         );
       },
       hr() {
-        return `<hr style="border:0;border-top:1px solid ${t.line};margin:22px 0">`;
+        return `<hr style="border:0;${hairline("border-top", t.line)};margin:22px 0">`;
       },
       blockquote({ tokens }: Tokens.Blockquote) {
         const first = tokens[0] as Tokens.Paragraph | undefined;
@@ -151,11 +156,11 @@ function emailMarked(b: Brand): Marked {
           .map(
             (r) =>
               `<tr>${r
-                .map((c, i) => `<td align="${align(i)}" style="padding:10px 14px;border-top:1px solid ${t.line};${font("14px")}color:${t.text};text-align:${align(i)}">${this.parser.parseInline(c.tokens)}</td>`)
+                .map((c, i) => `<td align="${align(i)}" style="padding:10px 14px;${hairline("border-top", t.line)};${font("14px")}color:${t.text};text-align:${align(i)}">${this.parser.parseInline(c.tokens)}</td>`)
                 .join("")}</tr>`,
           )
           .join("");
-        return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:4px 0 18px;border-collapse:collapse;border:1px solid ${t.line}"><tr>${head}</tr>${rows}</table>`;
+        return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:4px 0 18px;border-collapse:collapse;${hairline("border", t.line)}"><tr>${head}</tr>${rows}</table>`;
       },
     },
   });
@@ -175,12 +180,12 @@ export function renderEmail(md: string, brand: Brand = DEFAULT_BRAND, signatureH
   // An empty <p> left by a button inside a paragraph is dropped.
   const inner = (emailMarked(brand).parse(md) as string).replace(/<p style="[^"]*">\s*<\/p>/g, "");
   const sig = signatureHtml
-    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:26px;border-collapse:collapse"><tr><td style="border-top:1px solid ${t.line};padding-top:16px">${signatureHtml}</td></tr></table>`
+    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:26px;border-collapse:collapse"><tr><td style="${hairline("border-top", t.line)};padding-top:16px">${signatureHtml}</td></tr></table>`
     : "";
   const fontLink = brand.fontUrl ? `<link href="${escapeHtml(brand.fontUrl)}" rel="stylesheet">` : "";
   return (
     `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">${fontLink}</head>` +
-    `<body style="margin:0;padding:0;background:#ffffff">` +
+    `<body style="margin:0;padding:0">` +
     `<div style="max-width:640px;padding:8px 4px;font-family:${t.font};color:${t.text}">${inner}${sig}</div></body></html>`
   );
 }
