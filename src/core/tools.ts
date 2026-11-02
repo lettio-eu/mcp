@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import { base64ToBytes, bytesToBase64 } from "./format.js";
+import { base64ToBytes, bytesToBase64, textSignatureToHtml } from "./format.js";
 import type { Attachment, BodyFormat, EmailFull, EmailSummary, JmapClient, OutgoingAttachment } from "./jmap.js";
 
 /** Largest attachment returned inline to a model. */
@@ -115,8 +115,14 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
       .describe("Files to attach. Give content_base64, or from_email_id with attachment_id."),
   };
   const compose = {
-    body: z.string().describe("The message. Markdown by default: headings, bold, lists, links and tables work."),
+    body: z
+      .string()
+      .describe(
+        "The message in Markdown. Supports headings, bold, lists, tables, `> quote` (end with `> — Name` for attribution), " +
+          "callouts `> [!NOTE] Title`, code blocks, and buttons `[Label](https://url \"button\")`. Numbered lists render as steps.",
+      ),
     format: z.enum(["markdown", "plain"]).optional().describe('"plain" sends text as written, without formatting.'),
+    signature: z.boolean().optional().describe("Append the mailbox signature. Default true; don't write a sign-off block yourself."),
     ...attachments,
   };
   const message = {
@@ -316,7 +322,7 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
       requireSend();
       const c = ctx.client(a.account);
       const atts = await resolveAttachments(c, a.attachments);
-      await c.send({ to: a.to, cc: a.cc, bcc: a.bcc, subject: a.subject, body: a.body, format: fmt(a.format), attachments: atts });
+      await c.send({ to: a.to, cc: a.cc, bcc: a.bcc, subject: a.subject, body: a.body, format: fmt(a.format), attachments: atts, signature: a.signature });
       return text(`Sent from ${c.address} to ${a.to.join(", ")}.`);
     },
   );
@@ -330,7 +336,7 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
       requireSend();
       const c = ctx.client(a.account);
       const atts = await resolveAttachments(c, a.attachments);
-      await c.reply(a.id, { body: a.body, format: fmt(a.format), replyAll: a.reply_all, attachments: atts });
+      await c.reply(a.id, { body: a.body, format: fmt(a.format), replyAll: a.reply_all, attachments: atts, signature: a.signature });
       return text("Reply sent.");
     },
   );
@@ -343,7 +349,7 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
     async (a) => {
       const c = ctx.client(a.account);
       const atts = await resolveAttachments(c, a.attachments);
-      const id = await c.createDraft({ to: a.to, cc: a.cc, bcc: a.bcc, subject: a.subject, body: a.body, format: fmt(a.format), attachments: atts });
+      const id = await c.createDraft({ to: a.to, cc: a.cc, bcc: a.bcc, subject: a.subject, body: a.body, format: fmt(a.format), attachments: atts, signature: a.signature });
       return text(`Draft saved [${id}]. Nothing was sent.`);
     },
   );
@@ -356,7 +362,7 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
     async (a) => {
       const c = ctx.client(a.account);
       const atts = await resolveAttachments(c, a.attachments);
-      const id = await c.createReplyDraft(a.id, { body: a.body, format: fmt(a.format), replyAll: a.reply_all, attachments: atts });
+      const id = await c.createReplyDraft(a.id, { body: a.body, format: fmt(a.format), replyAll: a.reply_all, attachments: atts, signature: a.signature });
       return text(`Reply draft saved [${id}]. Nothing was sent.`);
     },
   );
@@ -370,6 +376,33 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
       requireSend();
       await ctx.client(a.account).sendDraft(a.id);
       return text("Draft sent.");
+    },
+  );
+
+  tool(
+    "get_signature",
+    "Show the signature that is added to outgoing mail.",
+    { ...account },
+    READ,
+    async (a) => {
+      const sig = await ctx.client(a.account).getSignature();
+      return text(sig.text || sig.html ? `Text:\n${sig.text}\n\nHTML:\n${sig.html}` : "No signature set.");
+    },
+  );
+
+  tool(
+    "set_signature",
+    "Set the signature added to outgoing mail. Stored on the mailbox, so it applies to every client that reads it.",
+    {
+      text: z.string().describe("Plain-text signature, one item per line, name first."),
+      html: z.string().optional().describe("Optional HTML version. Built from the text when omitted."),
+      ...account,
+    },
+    WRITE,
+    async (a) => {
+      const c = ctx.client(a.account);
+      await c.setSignature(a.html ?? textSignatureToHtml(a.text, c.brand), a.text);
+      return text("Signature saved.");
     },
   );
 

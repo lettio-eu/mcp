@@ -3,7 +3,7 @@
  * Runs on Node and Cloudflare Workers, so no Node-only APIs here.
  */
 
-import { bytesToBase64, htmlToText, markdownToHtml } from "./format.js";
+import { type Brand, DEFAULT_BRAND, bytesToBase64, htmlToText, renderEmail, textSignatureToHtml } from "./format.js";
 
 const CAP_CORE = "urn:ietf:params:jmap:core";
 const CAP_MAIL = "urn:ietf:params:jmap:mail";
@@ -95,11 +95,14 @@ export type Outgoing = {
   body: string;
   format?: BodyFormat;
   attachments?: OutgoingAttachment[];
+  /** Append the mailbox signature. Default true. */
+  signature?: boolean;
 };
 
 export type ReplyInput = {
   body: string;
   format?: BodyFormat;
+  signature?: boolean;
   replyAll?: boolean;
   attachments?: OutgoingAttachment[];
 };
@@ -118,6 +121,9 @@ export class JmapClient {
   private session?: Session;
   private mailboxes: Record<string, string> = {};
   private identityId?: string;
+  private signatureCache?: { html: string; text: string };
+  /** How formatted mail from this mailbox looks. */
+  brand: Brand = DEFAULT_BRAND;
 
   constructor(baseUrl: string, username: string, password: string) {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
@@ -351,17 +357,52 @@ export class JmapClient {
   }
 
   /** Fill in body parts and attachments on a message being composed. */
+  /** The signature stored on this mailbox's sending identity. */
+  async getSignature(): Promise<{ html: string; text: string }> {
+    if (this.signatureCache) return this.signatureCache;
+    const s = await this.getSession();
+    const r = await this.call([CAP_CORE, CAP_SUBMISSION], [
+      ["Identity/get", { accountId: s.accountId, properties: ["id", "email", "htmlSignature", "textSignature"] }, "0"],
+    ]);
+    const id = (r.methodResponses[0][1].list as any[]).find(
+      (i) => i.email?.toLowerCase() === this.fromEmail.toLowerCase(),
+    );
+    this.signatureCache = { html: id?.htmlSignature || "", text: id?.textSignature || "" };
+    return this.signatureCache;
+  }
+
+  /** Store the signature on this mailbox's sending identity, so it applies everywhere. */
+  async setSignature(html: string, text: string): Promise<void> {
+    const s = await this.getSession();
+    const identityId = await this.getIdentityId();
+    const r = await this.call([CAP_CORE, CAP_SUBMISSION], [
+      ["Identity/set", { accountId: s.accountId, update: { [identityId]: { htmlSignature: html, textSignature: text } } }, "0"],
+    ]);
+    const failed = r.methodResponses[0][1].notUpdated?.[identityId];
+    if (failed) throw new Error(`Could not save the signature: ${JSON.stringify(failed)}`);
+    this.signatureCache = { html, text };
+  }
+
+  /** The exact HTML a Markdown message would be sent as, signature included. */
+  async renderHtml(text: string, withSignature = true): Promise<string> {
+    const sig = withSignature ? await this.getSignature() : { html: "", text: "" };
+    const sigHtml = sig.html || (sig.text ? textSignatureToHtml(sig.text, this.brand) : "");
+    return renderEmail(text, this.brand, sigHtml || undefined);
+  }
+
   private async compose(
     emailObj: any,
     text: string,
     format: BodyFormat,
     attachments: OutgoingAttachment[],
+    withSignature = true,
   ): Promise<void> {
     if (format === "plain") {
-      emailObj.bodyValues = { text: { value: text } };
+      const sig = withSignature ? (await this.getSignature()).text : "";
+      emailObj.bodyValues = { text: { value: sig ? `${text}\n\n-- \n${sig}` : text } };
       emailObj.textBody = [{ partId: "text", type: "text/plain" }];
     } else {
-      const html = markdownToHtml(text);
+      const html = await this.renderHtml(text, withSignature);
       emailObj.bodyValues = { text: { value: htmlToText(html) }, html: { value: html } };
       emailObj.textBody = [{ partId: "text", type: "text/plain" }];
       emailObj.htmlBody = [{ partId: "html", type: "text/html" }];
@@ -504,7 +545,7 @@ export class JmapClient {
   private async newMessage(m: Outgoing): Promise<any> {
     const emailObj: any = { to: m.to.map((email) => ({ email })), subject: m.subject };
     if (m.cc?.length) emailObj.cc = m.cc.map((email) => ({ email }));
-    await this.compose(emailObj, m.body, m.format ?? "markdown", m.attachments ?? []);
+    await this.compose(emailObj, m.body, m.format ?? "markdown", m.attachments ?? [], m.signature !== false);
     return emailObj;
   }
 
@@ -585,7 +626,7 @@ export class JmapClient {
     const references = [...(orig.references || []), ...(orig.messageId || [])];
 
     const emailObj: any = { to: to.map((email) => ({ email })), subject };
-    await this.compose(emailObj, m.body, m.format ?? "markdown", m.attachments ?? []);
+    await this.compose(emailObj, m.body, m.format ?? "markdown", m.attachments ?? [], m.signature !== false);
     if (cc.length) emailObj.cc = cc.map((email) => ({ email }));
     if (orig.messageId?.length) emailObj.inReplyTo = orig.messageId;
     if (references.length) emailObj.references = references;

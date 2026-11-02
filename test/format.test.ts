@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { base64ToBytes, bytesToBase64, htmlToText, markdownToHtml } from "../src/core/format.js";
+import { base64ToBytes, bytesToBase64, htmlToText, markdownToHtml, renderEmail } from "../src/core/format.js";
 
 test("markdown becomes formatted html", () => {
   const html = markdownToHtml("# Hi\n\n**bold**\n\n- a\n- b\n\n| x |\n|---|\n| 1 |");
-  for (const tag of ["<h1>", "<strong>", "<li>", "<table>"]) assert.ok(html.includes(tag), tag);
+  for (const tag of ["<h1 ", "<strong ", "<li ", "<table "]) assert.ok(html.includes(tag), tag);
 });
 
 test("raw html is escaped, not rendered", () => {
@@ -37,6 +37,13 @@ test("layout tables don't leave stray separators", () => {
 test("nested lists keep their numbering", () => {
   const t = htmlToText("<ol><li>a<ol><li>x</li></ol></li><li>b</li></ol>");
   assert.ok(t.includes("1. x") && t.includes("2. b"), t);
+});
+
+test("rich blocks render and read back as text", () => {
+  const md = "> Quote line\n>\n> — Jana\n\n> [!NOTE] Heads up\n> Price holds.\n\n[Approve](https://valmia.cz \"button\")\n\n```\ndig MX x\n```";
+  const html = renderEmail(md, { primary: "#231F47", accent: "#D8093A" }, "<b>Martin</b>");
+  for (const s of ["#D8093A", "Heads up", ">Approve</a>", "dig MX x", "<b>Martin</b>"]) assert.ok(html.includes(s), s);
+  assert.equal(htmlToText(html), "Quote line\n\nJana\n\nHeads up\n\nPrice holds.\n\nApprove (https://valmia.cz)\n\ndig MX x\n\nMartin");
 });
 
 test("base64 round-trips binary", () => {

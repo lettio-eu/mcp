@@ -40,7 +40,15 @@ and send a reply.
 | `move_email` | Move to a folder, `archive`, or `trash` (reversible). |
 | `create_folder` | Create a mail folder. |
 
-Messages are written in Markdown and go out as HTML with a plain-text version. Pass `format: "plain"` to send text as written. Bulk tools take up to 100 ids.
+Messages are written in Markdown and rendered as a styled email: headings, tables, quotes (end with `> — Name`), callouts (`> [!NOTE] Title`), code blocks, numbered steps and buttons (`[Label](https://url "button")`). The mailbox signature is added automatically; set it with `set_signature`.
+
+To match your brand, set `LETTIO_BRANDS` to JSON (or a path to a JSON file) keyed by domain:
+
+```json
+{ "example.com": { "primary": "#231F47", "accent": "#D8093A", "font": "Lexend, Arial, sans-serif" } }
+```
+
+Formatted mail goes out as HTML with a plain-text version. Pass `format: "plain"` to send text as written. Bulk tools take up to 100 ids.
 
 Attachments can be base64 content, a local `path`, or `from_email_id` with `attachment_id` to reuse a file from another message.
 
