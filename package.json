@@ -1,6 +1,6 @@
 {
   "name": "@lettio/mcp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "mcpName": "eu.lettio/mcp",
   "publishConfig": {
     "access": "public"

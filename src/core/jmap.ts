@@ -78,6 +78,8 @@ export type EmailFull = EmailSummary & {
   body: string;
   truncated: boolean;
   attachments: Attachment[];
+  /** The original HTML part, unsanitised. Only for display after sanitising. */
+  html: string;
 };
 
 function addrs(list: Array<{ name?: string; email: string }> | null | undefined): string {
@@ -217,6 +219,10 @@ export class JmapClient {
       if (v.isTruncated) truncated = true;
       body += (p.type === "text/html" ? htmlToText(v.value) : v.value) + "\n";
     }
+    let html = "";
+    for (const p of e.htmlBody || []) {
+      if (p.type === "text/html" && e.bodyValues?.[p.partId]?.value) html += e.bodyValues[p.partId].value;
+    }
     const attachments: Attachment[] = (e.attachments || []).map((a: any) => ({
       id: a.blobId,
       name: a.name || "(unnamed)",
@@ -224,7 +230,7 @@ export class JmapClient {
       size: a.size || 0,
       inline: a.disposition === "inline" || !!a.cid,
     }));
-    return { ...this.summarize(e), cc: addrs(e.cc), body: body.trim(), truncated, attachments };
+    return { ...this.summarize(e), cc: addrs(e.cc), body: body.trim(), truncated, attachments, html };
   }
 
   private async query(filter: any, limit: number, offset: number): Promise<EmailSummary[]> {

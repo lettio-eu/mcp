@@ -3,3 +3,5 @@ export { registerTools } from "./tools.js";
 export type { ToolContext } from "./tools.js";
 export { DEFAULT_BRAND, renderEmail } from "./format.js";
 export type { Brand } from "./format.js";
+export { htmlToText, textSignatureToHtml } from "./format.js";
+export type { EmailFull, EmailSummary } from "./jmap.js";

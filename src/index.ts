@@ -84,7 +84,7 @@ function pick(account?: string): JmapClient {
   return client;
 }
 
-const server = new McpServer({ name: "lettio-mcp", version: "0.4.0" });
+const server = new McpServer({ name: "lettio-mcp", version: "0.5.0" });
 
 registerTools(server, {
   client: pick,

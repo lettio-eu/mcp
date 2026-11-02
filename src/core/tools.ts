@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { base64ToBytes, bytesToBase64, textSignatureToHtml } from "./format.js";
 import type { Attachment, BodyFormat, EmailFull, EmailSummary, JmapClient, OutgoingAttachment } from "./jmap.js";
+export type { Tagged };
 
 /** Largest attachment returned inline to a model. */
 const MAX_INLINE_BYTES = 8 * 1024 * 1024;
@@ -38,15 +39,17 @@ function size(n: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function fmtSummary(e: EmailSummary, i: number): string {
+type Tagged = EmailSummary & { account?: string };
+
+function fmtSummary(e: Tagged, i: number): string {
   const marks = [e.unread ? "unread" : "", e.flagged ? "flagged" : "", e.hasAttachment ? "attachment" : "", ...e.labels]
     .filter(Boolean)
     .join(", ");
   const when = e.receivedAt ? new Date(e.receivedAt).toLocaleString() : "";
-  return `${i + 1}. [${e.id}]${marks ? ` (${marks})` : ""}\n   From: ${e.from}\n   ${when} — ${e.subject}\n   ${e.preview}`;
+  return `${i + 1}. [${e.id}]${marks ? ` (${marks})` : ""}${e.account ? `\n   Mailbox: ${e.account}` : ""}\n   From: ${e.from}\n   ${when} — ${e.subject}\n   ${e.preview}`;
 }
 
-function fmtList(title: string, emails: EmailSummary[]): string {
+function fmtList(title: string, emails: Tagged[]): string {
   if (!emails.length) return `No messages found in ${title}.`;
   return `${title} — ${emails.length} message(s):\n\n${emails.map(fmtSummary).join("\n\n")}`;
 }
@@ -93,8 +96,23 @@ async function pdfText(bytes: Uint8Array): Promise<string | null> {
 
 export function registerTools(server: McpServerLike, ctx: ToolContext): void {
   const account = ctx.accounts
-    ? { account: z.string().optional().describe("Which configured account to use. Defaults to the first.") }
+    ? {
+        account: z
+          .string()
+          .optional()
+          .describe("Which mailbox to use. Defaults to the first. Pass the Mailbox shown in a list result when acting on that email."),
+      }
     : {};
+
+  /** Several mailboxes and none chosen: run on each and merge newest first. */
+  const many = (a: any) => !!ctx.accounts && !a.account && ctx.accounts().length > 1;
+  async function across(a: any, run: (c: JmapClient) => Promise<EmailSummary[]>): Promise<Tagged[]> {
+    if (!many(a)) return run(ctx.client(a.account));
+    const per = await Promise.all(
+      ctx.accounts!().map(async (acc) => (await run(ctx.client(acc.name))).map((e) => ({ ...e, account: acc.name }))),
+    );
+    return per.flat().sort((x, y) => (y.receivedAt || "").localeCompare(x.receivedAt || ""));
+  }
   const ids = {
     ids: z.array(z.string()).min(1).max(100).describe("One or more email ids."),
     ...account,
@@ -208,13 +226,14 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
     READ,
     async (a) => {
       const box = a.mailbox ?? "inbox";
-      return text(fmtList(`"${box}"`, await ctx.client(a.account).listRecent(a.limit ?? 10, box, a.unread_only, a.offset ?? 0)));
+      const list = await across(a, (c) => c.listRecent(a.limit ?? 10, box, a.unread_only, a.offset ?? 0));
+      return text(fmtList(`"${box}"`, list.slice(0, a.limit ?? 10)));
     },
   );
 
   tool(
     "search_emails",
-    "Search email. Combine free text with filters; all given filters must match.",
+    "Search email. Combine free text with filters; all given filters must match. With several mailboxes and no account, searches them all.",
     {
       query: z.string().optional().describe("Free text across sender, subject and body."),
       from: z.string().optional().describe("Sender contains."),
@@ -234,7 +253,7 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
       text(
         fmtList(
           "search results",
-          await ctx.client(a.account).search({
+          (await across(a, (c) => c.search({
             text: a.query,
             from: a.from,
             to: a.to,
@@ -246,7 +265,7 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
             mailbox: a.mailbox,
             limit: a.limit,
             offset: a.offset,
-          }),
+          }))).slice(0, a.limit ?? 10),
         ),
       ),
   );
