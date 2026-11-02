@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import { base64ToBytes, bytesToBase64, textSignatureToHtml } from "./format.js";
+import { notDelivered } from "./jmap.js";
 import type { Attachment, BodyFormat, EmailFull, EmailSummary, JmapClient, OutgoingAttachment } from "./jmap.js";
 export type { Tagged };
 
@@ -341,8 +342,8 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
       requireSend();
       const c = ctx.client(a.account);
       const atts = await resolveAttachments(c, a.attachments);
-      await c.send({ to: a.to, cc: a.cc, bcc: a.bcc, subject: a.subject, body: a.body, format: fmt(a.format), attachments: atts, signature: a.signature });
-      return text(`Sent from ${c.address} to ${a.to.join(", ")}.`);
+      const r = await c.send({ to: a.to, cc: a.cc, bcc: a.bcc, subject: a.subject, body: a.body, format: fmt(a.format), attachments: atts, signature: a.signature });
+      return text(`Sent from ${c.address} to ${r.accepted.join(", ")}.${notDelivered(r)}`);
     },
   );
 
@@ -355,8 +356,8 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
       requireSend();
       const c = ctx.client(a.account);
       const atts = await resolveAttachments(c, a.attachments);
-      await c.reply(a.id, { body: a.body, format: fmt(a.format), replyAll: a.reply_all, attachments: atts, signature: a.signature });
-      return text("Reply sent.");
+      const r = await c.reply(a.id, { body: a.body, format: fmt(a.format), replyAll: a.reply_all, attachments: atts, signature: a.signature });
+      return text(`Reply sent to ${r.accepted.join(", ")}.${notDelivered(r)}`);
     },
   );
 
@@ -393,8 +394,8 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
     SEND,
     async (a) => {
       requireSend();
-      await ctx.client(a.account).sendDraft(a.id);
-      return text("Draft sent.");
+      const r = await ctx.client(a.account).sendDraft(a.id);
+      return text(`Draft sent to ${r.accepted.join(", ")}.${notDelivered(r)}`);
     },
   );
 

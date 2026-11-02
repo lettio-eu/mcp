@@ -101,6 +101,25 @@ export type Outgoing = {
   signature?: boolean;
 };
 
+/** What the mail server did with a send, per recipient. */
+export type SendResult = {
+  /** The EmailSubmission id. */
+  id: string;
+  /** Recipients the server accepted for delivery. */
+  accepted: string[];
+  /** Recipients it refused, with its SMTP reply. */
+  rejected: Array<{ email: string; reason: string }>;
+};
+
+function listRejected(rejected: SendResult["rejected"]): string {
+  return rejected.map((r) => `${r.email}: ${r.reason.replace(/\.$/, "")}`).join("; ");
+}
+
+/** " Not delivered to …" for a partial send, or "" when everyone got it. */
+export function notDelivered(r: SendResult): string {
+  return r.rejected.length ? ` Not delivered to ${listRejected(r.rejected)}.` : "";
+}
+
 export type ReplyInput = {
   body: string;
   format?: BodyFormat;
@@ -455,7 +474,7 @@ export class JmapClient {
    * from, keywords and mailbox placement are set here so every code path that
    * sends goes through the same address-pinning guarantees.
    */
-  private async submit(emailObj: any, rcptEmails: string[]): Promise<string> {
+  private async submit(emailObj: any, rcptEmails: string[]): Promise<SendResult> {
     const s = await this.getSession();
     const identityId = await this.getIdentityId();
     const draftsId = await this.mailbox("drafts");
@@ -473,7 +492,18 @@ export class JmapClient {
     if (setEmail.notCreated?.draft) {
       throw new Error(`Could not create message: ${JSON.stringify(setEmail.notCreated.draft)}`);
     }
-    return this.submissionResult(r.methodResponses[1][1]);
+    const result = await this.submissionResult(r.methodResponses[1][1], rcptEmails);
+    if (!result.accepted.length) {
+      // onSuccessUpdateEmail already moved it to Sent; it went nowhere, so remove it.
+      const emailId = setEmail.created?.draft?.id;
+      if (emailId) {
+        await this.call([CAP_CORE, CAP_MAIL], [["Email/set", { accountId: s.accountId, destroy: [emailId] }, "0"]]).catch(
+          () => {},
+        );
+      }
+      throw new Error(`Not sent: the mail server refused every recipient (${listRejected(result.rejected)}).`);
+    }
+    return result;
   }
 
   private async submissionCall(
@@ -508,15 +538,43 @@ export class JmapClient {
     ];
   }
 
-  private submissionResult(setSub: any): string {
+  /**
+   * A created submission is not proof of sending: Stalwart answers `created`
+   * even when it refused every RCPT TO, and only the submission's
+   * deliveryStatus (not returned by /set) says so. Read it back and split the
+   * recipients into accepted and refused, with the server's SMTP reply.
+   */
+  private async submissionResult(setSub: any, rcptEmails: string[]): Promise<SendResult> {
     if (setSub.notCreated?.sub) {
       throw new Error(`Could not send: ${JSON.stringify(setSub.notCreated.sub)}`);
     }
-    return setSub.created?.sub?.id || "sent";
+    const id = setSub.created?.sub?.id;
+    if (!id) throw new Error("Could not send: the mail server did not confirm the submission.");
+    const s = await this.getSession();
+    const r = await this.call([CAP_CORE, CAP_SUBMISSION], [
+      ["EmailSubmission/get", { accountId: s.accountId, ids: [id], properties: ["undoStatus", "deliveryStatus"] }, "0"],
+    ]);
+    const sub = r.methodResponses[0][1].list?.[0];
+    if (sub?.undoStatus === "canceled") throw new Error("Not sent: the submission was canceled.");
+    const status = new Map(
+      Object.entries(sub?.deliveryStatus || {}).map(([email, st]) => [email.toLowerCase(), st as any]),
+    );
+    const result: SendResult = { id, accepted: [], rejected: [] };
+    const seen = new Set<string>();
+    for (const email of rcptEmails) {
+      const key = email.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const st = status.get(key);
+      // A server that doesn't track delivery leaves it out; only a "no" is a refusal.
+      if (st?.delivered === "no") result.rejected.push({ email, reason: String(st.smtpReply || "refused").trim() });
+      else result.accepted.push(email);
+    }
+    return result;
   }
 
   /** Send a draft already in this mailbox. Its From must be this address. */
-  async sendDraft(id: string): Promise<string> {
+  async sendDraft(id: string): Promise<SendResult> {
     const s = await this.getSession();
     const r = await this.call([CAP_CORE, CAP_MAIL], [
       [
@@ -539,11 +597,23 @@ export class JmapClient {
     const sent = await this.call([CAP_CORE, CAP_MAIL, CAP_SUBMISSION], [
       await this.submissionCall(identityId, id, rcpt, draftsId),
     ]);
-    return this.submissionResult(sent.methodResponses[0][1]);
+    const result = await this.submissionResult(sent.methodResponses[0][1], rcpt);
+    if (!result.accepted.length) {
+      // onSuccessUpdateEmail already filed it in Sent; put the draft back.
+      if (draftsId) {
+        await this.call([CAP_CORE, CAP_MAIL], [
+          ["Email/set", { accountId: s.accountId, update: { [id]: { mailboxIds: { [draftsId]: true }, "keywords/$draft": true } } }, "0"],
+        ]).catch(() => {});
+      }
+      throw new Error(
+        `Not sent: the mail server refused every recipient (${listRejected(result.rejected)}). The draft is still in Drafts.`,
+      );
+    }
+    return result;
   }
 
   /** Bcc goes in the envelope only, so the address never appears in the message. */
-  async send(m: Outgoing): Promise<string> {
+  async send(m: Outgoing): Promise<SendResult> {
     const emailObj = await this.newMessage(m);
     return this.submit(emailObj, [...m.to, ...(m.cc || []), ...(m.bcc || [])]);
   }
@@ -644,7 +714,7 @@ export class JmapClient {
    * Reply to a message, preserving the conversation thread, and send it (only
    * ever from this authenticated mailbox).
    */
-  async reply(id: string, m: ReplyInput): Promise<string> {
+  async reply(id: string, m: ReplyInput): Promise<SendResult> {
     const { emailObj, rcpt } = await this.buildReply(id, m);
     return this.submit(emailObj, rcpt);
   }
