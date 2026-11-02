@@ -22,7 +22,21 @@ test("html converts to readable text", () => {
   const t = htmlToText(
     '<html><head><style>p{}</style></head><body><p>Hello&nbsp;<b>you</b></p><ul><li>One</li></ul><a href="https://a.eu">site</a><script>x</script></body></html>',
   );
-  assert.equal(t, "Hello you\n\n- One\nsite (https://a.eu)");
+  assert.equal(t, "Hello you\n\n- One\n\nsite (https://a.eu)");
+});
+
+test("lists and tables stay readable as text", () => {
+  const t = htmlToText(markdownToHtml("- a\n- b\n\n1. one\n2. two\n\n| Name | State |\n|---|---|\n| Mail | done |\n| Files | later |"));
+  assert.equal(t, "- a\n- b\n\n1. one\n2. two\n\nName | State\nMail | done\nFiles | later");
+});
+
+test("layout tables don't leave stray separators", () => {
+  assert.equal(htmlToText("<table><tr><td></td><td></td></tr><tr><td>Hi</td></tr></table>"), "Hi");
+});
+
+test("nested lists keep their numbering", () => {
+  const t = htmlToText("<ol><li>a<ol><li>x</li></ol></li><li>b</li></ol>");
+  assert.ok(t.includes("1. x") && t.includes("2. b"), t);
 });
 
 test("base64 round-trips binary", () => {

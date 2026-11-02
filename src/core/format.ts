@@ -54,11 +54,27 @@ function decodeEntities(s: string): string {
   });
 }
 
-/** Convert an HTML email into readable text, keeping links and list structure. */
+/** Number the items of each list, innermost first so nested lists stay intact. */
+function numberLists(html: string): string {
+  const inner = /<ol\b[^>]*>((?:(?!<ol\b|<\/ol>)[\s\S])*)<\/ol>/gi;
+  let prev = "";
+  while (prev !== html) {
+    prev = html;
+    html = html.replace(inner, (_w, items: string) => {
+      let n = 0;
+      return `\n${items.replace(/<li\b[^>]*>/gi, () => `\n${++n}. `)}\n`;
+    });
+  }
+  return html;
+}
+
+/** Convert an HTML email into readable text, keeping links, lists and table rows. */
 export function htmlToText(html: string): string {
-  let s = html
+  const cleaned = html
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<(head|style|script|title)\b[\s\S]*?<\/\1>/gi, "")
+    .replace(/\s*(<\/?(?:table|thead|tbody|tfoot|tr|td|th|ul|ol|li)\b[^>]*>)\s*/gi, "$1");
+  let s = numberLists(cleaned)
     .replace(/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (_w, href: string, label: string) => {
       const text = label.replace(/<[^>]+>/g, "").trim();
       if (!text || href.toLowerCase().startsWith("mailto:") || text === href) return text || href;
@@ -67,14 +83,16 @@ export function htmlToText(html: string): string {
     .replace(/<img\b[^>]*alt\s*=\s*["']([^"']+)["'][^>]*>/gi, "[$1]")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<li\b[^>]*>/gi, "\n- ")
-    .replace(/<\/t[dh]>/gi, "  ")
-    .replace(/<\/(p|div|tr|table|ul|ol|h[1-6]|blockquote|section|article)>/gi, "\n")
-    .replace(/<(p|h[1-6]|blockquote|ul|ol|table)\b[^>]*>/gi, "\n")
+    .replace(/<\/t[dh]>(?=<t[dh]\b)/gi, " | ")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<\/(p|div|table|ul|ol|h[1-6]|blockquote|section|article)>/gi, "\n\n")
+    .replace(/<(p|h[1-6]|blockquote|ul|table)\b[^>]*>/gi, "\n\n")
     .replace(/<[^>]+>/g, "");
   s = decodeEntities(s);
   return s
     .replace(/[ \t\f\v ]+/g, " ")
     .replace(/ *\n */g, "\n")
+    .replace(/^[| ]+$/gm, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }

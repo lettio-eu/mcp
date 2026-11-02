@@ -1,6 +1,6 @@
 {
   "name": "@lettio/mcp",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "mcpName": "eu.lettio/mcp",
   "publishConfig": {
     "access": "public"
@@ -28,7 +28,7 @@
     "url": "https://github.com/lettio-eu/mcp/issues"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "prepublishOnly": "npm run build",
