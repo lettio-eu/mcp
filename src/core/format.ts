@@ -13,11 +13,11 @@ const SAFE_LINK = /^(https?:|mailto:|tel:)/i;
 
 /** How mail from one domain looks. Every colour is a hex value. */
 export type Brand = {
-  /** Headings, table heads, numbered steps and buttons. */
+  /** Numbered steps and buttons. */
   primary: string;
   /** Links and the quote bar. */
   accent: string;
-  /** Body text. */
+  /** Body text. Leave unset so text follows the reader's light or dark mode. */
   text?: string;
   /** Secondary text, captions and quote attribution. */
   muted?: string;
@@ -46,10 +46,15 @@ function theme(b: Brand) {
   return {
     primary: b.primary,
     accent: b.accent,
-    text: b.text ?? "#2b2b33",
+    /**
+     * Text has no colour unless the brand sets one, so it follows the reader's
+     * light or dark mode, including while a draft is edited in a mail app.
+     */
+    ink: b.text ? `color:${b.text};` : "",
     muted: b.muted ?? "#6b6b78",
     line: b.line ?? "#e6e6ec",
-    soft: b.soft ?? "#f5f5f8",
+    /** A see-through tint reads in both modes. Outlook keeps the solid fallback. */
+    tint: `background:${b.soft ?? "#f5f5f8"};background:rgba(128,128,140,0.14)`,
     font: b.font ?? "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
   };
 }
@@ -62,7 +67,7 @@ function hairline(side: "border" | "border-top", solid: string): string {
 function emailMarked(b: Brand): Marked {
   const t = theme(b);
   const font = (size: string, weight = 400, extra = "") => `font-family:${t.font};font-size:${size};font-weight:${weight};${extra}`;
-  const P = `margin:0 0 14px;${font("15px", 400, "line-height:1.6;")}color:${t.text}`;
+  const P = `margin:0 0 14px;${font("15px", 400, "line-height:1.6;")}${t.ink}`;
   const block = (inner: string, margin = "6px 0 18px") =>
     `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:${margin};border-collapse:collapse">${inner}</table>`;
 
@@ -80,7 +85,7 @@ function emailMarked(b: Brand): Marked {
       },
       heading({ tokens, depth }) {
         const size = depth === 1 ? "21px" : depth === 2 ? "18px" : "16px";
-        return `<h${depth} style="margin:26px 0 10px;${font(size, 600, "line-height:1.3;")}color:${t.primary}">${this.parser.parseInline(tokens)}</h${depth}>`;
+        return `<h${depth} style="margin:26px 0 10px;${font(size, 600, "line-height:1.3;")}${t.ink}">${this.parser.parseInline(tokens)}</h${depth}>`;
       },
       strong({ tokens }) {
         return `<strong style="font-weight:600">${this.parser.parseInline(tokens)}</strong>`;
@@ -101,11 +106,11 @@ function emailMarked(b: Brand): Marked {
         return SAFE_LINK.test(href) ? `<a href="${escapeHtml(href)}" style="color:${t.accent}">${escapeHtml(text || href)}</a>` : escapeHtml(text);
       },
       codespan({ text }) {
-        return `<code class="lt-soft" style="padding:1px 5px;background:${t.soft};border-radius:4px;font-family:Menlo,Consolas,monospace;font-size:13px;color:${t.primary}">${text}</code>`;
+        return `<code class="lt-soft" style="padding:1px 5px;${t.tint};border-radius:4px;font-family:Menlo,Consolas,monospace;font-size:13px;${t.ink}">${text}</code>`;
       },
       code({ text }) {
         return block(
-          `<tr><td class="lt-soft" style="padding:12px 14px;background:${t.soft};border-radius:8px;font-family:Menlo,Consolas,monospace;font-size:13px;line-height:1.5;color:${t.primary};white-space:pre-wrap">${escapeHtml(text)}</td></tr>`,
+          `<tr><td class="lt-soft" style="padding:12px 14px;${t.tint};border-radius:8px;font-family:Menlo,Consolas,monospace;font-size:13px;line-height:1.5;${t.ink}white-space:pre-wrap">${escapeHtml(text)}</td></tr>`,
           "4px 0 18px",
         );
       },
@@ -121,7 +126,7 @@ function emailMarked(b: Brand): Marked {
           const body = [rest.join("\n"), ...tokens.slice(1).map((x) => x.raw)].join("\n").trim();
           const inner = body ? this.parser.parse(emailMarked(b).lexer(body)) : "";
           return block(
-            `<tr><td class="lt-soft" style="padding:14px 18px;background:${t.soft};border-radius:8px"><div style="${font("14px", 600)}color:${t.primary};margin-bottom:4px">${escapeHtml(title)}</div>${inner.replace(/margin:0 0 14px;/g, "margin:0;").replace(/font-size:15px/g, "font-size:14px")}</td></tr>`,
+            `<tr><td class="lt-soft" style="padding:14px 18px;${t.tint};border-radius:8px"><div style="${font("14px", 600)}${t.ink}margin-bottom:4px">${escapeHtml(title)}</div>${inner.replace(/margin:0 0 14px;/g, "margin:0;").replace(/font-size:15px/g, "font-size:14px")}</td></tr>`,
           );
         }
         let inner = this.parser.parse(tokens);
@@ -140,23 +145,23 @@ function emailMarked(b: Brand): Marked {
           const rows = items
             .map(
               (html, i) =>
-                `<tr><td valign="top" width="30" style="padding:0 0 10px"><div class="lt-on" data-step="${start + i}" style="width:22px;height:22px;border-radius:11px;background:${t.primary};color:#ffffff;${font("12px", 600, "line-height:22px;")}text-align:center">${start + i}</div></td><td style="padding:1px 0 10px;${font("15px", 400, "line-height:1.5;")}color:${t.text}">${html}</td></tr>`,
+                `<tr><td valign="top" width="30" style="padding:0 0 10px"><div class="lt-on" data-step="${start + i}" style="width:22px;height:22px;border-radius:11px;background:${t.primary};color:#ffffff;${font("12px", 600, "line-height:22px;")}text-align:center">${start + i}</div></td><td style="padding:1px 0 10px;${font("15px", 400, "line-height:1.5;")}${t.ink}">${html}</td></tr>`,
             )
             .join("");
           return block(rows, "4px 0 14px").replace('width="100%" ', "");
         }
-        return `<ul style="margin:0 0 14px;padding-left:22px;${font("15px", 400, "line-height:1.6;")}color:${t.text}">${items.map((h) => `<li style="margin:0 0 4px">${h}</li>`).join("")}</ul>`;
+        return `<ul style="margin:0 0 14px;padding-left:22px;${font("15px", 400, "line-height:1.6;")}${t.ink}">${items.map((h) => `<li style="margin:0 0 4px">${h}</li>`).join("")}</ul>`;
       },
       table(token: Tokens.Table) {
         const align = (i: number) => token.align[i] ?? "left";
         const head = token.header
-          .map((c, i) => `<th class="lt-soft" align="${align(i)}" style="padding:10px 14px;background:${t.soft};color:${t.primary};${font("13px", 600)}text-align:${align(i)}">${this.parser.parseInline(c.tokens)}</th>`)
+          .map((c, i) => `<th class="lt-soft" align="${align(i)}" style="padding:10px 14px;${t.tint};${t.ink}${font("13px", 600)}text-align:${align(i)}">${this.parser.parseInline(c.tokens)}</th>`)
           .join("");
         const rows = token.rows
           .map(
             (r) =>
               `<tr>${r
-                .map((c, i) => `<td align="${align(i)}" style="padding:10px 14px;${hairline("border-top", t.line)};${font("14px")}color:${t.text};text-align:${align(i)}">${this.parser.parseInline(c.tokens)}</td>`)
+                .map((c, i) => `<td align="${align(i)}" style="padding:10px 14px;${hairline("border-top", t.line)};${font("14px")}${t.ink}text-align:${align(i)}">${this.parser.parseInline(c.tokens)}</td>`)
                 .join("")}</tr>`,
           )
           .join("");
@@ -171,13 +176,14 @@ export function textSignatureToHtml(sig: string, brand: Brand = DEFAULT_BRAND): 
   const t = theme(brand);
   const lines = sig.trim().split("\n").map((l) => escapeHtml(l));
   const [name, ...rest] = lines;
-  return `<div style="font-family:${t.font};font-size:15px;font-weight:600;color:${t.primary}">${name}</div><div class="lt-muted" style="font-family:${t.font};font-size:13px;line-height:1.7;color:${t.muted}">${rest.join("<br>")}</div>`;
+  return `<div style="font-family:${t.font};font-size:15px;font-weight:600;${t.ink}">${name}</div><div class="lt-muted" style="font-family:${t.font};font-size:13px;line-height:1.7;color:${t.muted}">${rest.join("<br>")}</div>`;
 }
 
 /**
- * Dark mode. The inline colours are the light fallback; clients that report a
- * dark scheme (Apple Mail, Outlook for Mac and mobile, Thunderbird) switch the
- * text to light here. Clients without media queries keep the light look.
+ * Dark mode. Our text has no colour, so it already follows the reader. This
+ * also lightens colours we don't control, such as a signature's own HTML, in
+ * clients that read media queries (Apple Mail when reading, Outlook for Mac
+ * and mobile, Thunderbird). A mail app's editor ignores it.
  */
 const DARK_CSS =
   "@media (prefers-color-scheme:dark){" +
@@ -200,9 +206,9 @@ export function renderEmail(md: string, brand: Brand = DEFAULT_BRAND, signatureH
   const fontLink = brand.fontUrl ? `<link href="${escapeHtml(brand.fontUrl)}" rel="stylesheet">` : "";
   return (
     `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">` +
-    `<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">${fontLink}<style>${DARK_CSS}</style></head>` +
+    `${fontLink}<style>${DARK_CSS}</style></head>` +
     `<body style="margin:0;padding:0">` +
-    `<div class="lt-mail" style="max-width:640px;padding:8px 4px;font-family:${t.font};color:${t.text}">${inner}${sig}</div></body></html>`
+    `<div class="lt-mail" style="max-width:640px;padding:8px 4px;font-family:${t.font};${t.ink}">${inner}${sig}</div></body></html>`
   );
 }
 
