@@ -101,11 +101,11 @@ function emailMarked(b: Brand): Marked {
         return SAFE_LINK.test(href) ? `<a href="${escapeHtml(href)}" style="color:${t.accent}">${escapeHtml(text || href)}</a>` : escapeHtml(text);
       },
       codespan({ text }) {
-        return `<code style="padding:1px 5px;background:${t.soft};border-radius:4px;font-family:Menlo,Consolas,monospace;font-size:13px;color:${t.primary}">${text}</code>`;
+        return `<code class="lt-soft" style="padding:1px 5px;background:${t.soft};border-radius:4px;font-family:Menlo,Consolas,monospace;font-size:13px;color:${t.primary}">${text}</code>`;
       },
       code({ text }) {
         return block(
-          `<tr><td style="padding:12px 14px;background:${t.soft};border-radius:8px;font-family:Menlo,Consolas,monospace;font-size:13px;line-height:1.5;color:${t.primary};white-space:pre-wrap">${escapeHtml(text)}</td></tr>`,
+          `<tr><td class="lt-soft" style="padding:12px 14px;background:${t.soft};border-radius:8px;font-family:Menlo,Consolas,monospace;font-size:13px;line-height:1.5;color:${t.primary};white-space:pre-wrap">${escapeHtml(text)}</td></tr>`,
           "4px 0 18px",
         );
       },
@@ -121,13 +121,13 @@ function emailMarked(b: Brand): Marked {
           const body = [rest.join("\n"), ...tokens.slice(1).map((x) => x.raw)].join("\n").trim();
           const inner = body ? this.parser.parse(emailMarked(b).lexer(body)) : "";
           return block(
-            `<tr><td style="padding:14px 18px;background:${t.soft};border-radius:8px"><div style="${font("14px", 600)}color:${t.primary};margin-bottom:4px">${escapeHtml(title)}</div>${inner.replace(/margin:0 0 14px;/g, "margin:0;").replace(/font-size:15px/g, "font-size:14px")}</td></tr>`,
+            `<tr><td class="lt-soft" style="padding:14px 18px;background:${t.soft};border-radius:8px"><div style="${font("14px", 600)}color:${t.primary};margin-bottom:4px">${escapeHtml(title)}</div>${inner.replace(/margin:0 0 14px;/g, "margin:0;").replace(/font-size:15px/g, "font-size:14px")}</td></tr>`,
           );
         }
         let inner = this.parser.parse(tokens);
         inner = inner.replace(
           /<p style="[^"]*">(?:—|–|-{1,2})\s*([\s\S]*?)<\/p>\s*$/,
-          (_w, who: string) => `<div style="margin-top:6px;${font("13px")}color:${t.muted};font-style:normal">${who}</div>`,
+          (_w, who: string) => `<div class="lt-muted" style="margin-top:6px;${font("13px")}color:${t.muted};font-style:normal">${who}</div>`,
         );
         return block(
           `<tr><td width="3" data-bar="1" style="background:${t.accent}"></td><td style="padding:10px 16px;font-style:italic">${inner.replace(/margin:0 0 14px;/g, "margin:0 0 6px;")}</td></tr>`,
@@ -140,7 +140,7 @@ function emailMarked(b: Brand): Marked {
           const rows = items
             .map(
               (html, i) =>
-                `<tr><td valign="top" width="30" style="padding:0 0 10px"><div data-step="${start + i}" style="width:22px;height:22px;border-radius:11px;background:${t.primary};color:#ffffff;${font("12px", 600, "line-height:22px;")}text-align:center">${start + i}</div></td><td style="padding:1px 0 10px;${font("15px", 400, "line-height:1.5;")}color:${t.text}">${html}</td></tr>`,
+                `<tr><td valign="top" width="30" style="padding:0 0 10px"><div class="lt-on" data-step="${start + i}" style="width:22px;height:22px;border-radius:11px;background:${t.primary};color:#ffffff;${font("12px", 600, "line-height:22px;")}text-align:center">${start + i}</div></td><td style="padding:1px 0 10px;${font("15px", 400, "line-height:1.5;")}color:${t.text}">${html}</td></tr>`,
             )
             .join("");
           return block(rows, "4px 0 14px").replace('width="100%" ', "");
@@ -150,7 +150,7 @@ function emailMarked(b: Brand): Marked {
       table(token: Tokens.Table) {
         const align = (i: number) => token.align[i] ?? "left";
         const head = token.header
-          .map((c, i) => `<th align="${align(i)}" style="padding:10px 14px;background:${t.soft};color:${t.primary};${font("13px", 600)}text-align:${align(i)}">${this.parser.parseInline(c.tokens)}</th>`)
+          .map((c, i) => `<th class="lt-soft" align="${align(i)}" style="padding:10px 14px;background:${t.soft};color:${t.primary};${font("13px", 600)}text-align:${align(i)}">${this.parser.parseInline(c.tokens)}</th>`)
           .join("");
         const rows = token.rows
           .map(
@@ -171,8 +171,23 @@ export function textSignatureToHtml(sig: string, brand: Brand = DEFAULT_BRAND): 
   const t = theme(brand);
   const lines = sig.trim().split("\n").map((l) => escapeHtml(l));
   const [name, ...rest] = lines;
-  return `<div style="font-family:${t.font};font-size:15px;font-weight:600;color:${t.primary}">${name}</div><div style="font-family:${t.font};font-size:13px;line-height:1.7;color:${t.muted}">${rest.join("<br>")}</div>`;
+  return `<div style="font-family:${t.font};font-size:15px;font-weight:600;color:${t.primary}">${name}</div><div class="lt-muted" style="font-family:${t.font};font-size:13px;line-height:1.7;color:${t.muted}">${rest.join("<br>")}</div>`;
 }
+
+/**
+ * Dark mode. The inline colours are the light fallback; clients that report a
+ * dark scheme (Apple Mail, Outlook for Mac and mobile, Thunderbird) switch the
+ * text to light here. Clients without media queries keep the light look.
+ */
+const DARK_CSS =
+  "@media (prefers-color-scheme:dark){" +
+  ".lt-mail,.lt-mail p,.lt-mail div,.lt-mail span,.lt-mail td,.lt-mail th,.lt-mail li,.lt-mail ul,.lt-mail ol," +
+  ".lt-mail h1,.lt-mail h2,.lt-mail h3,.lt-mail h4,.lt-mail h5,.lt-mail h6,.lt-mail strong,.lt-mail b,.lt-mail em,.lt-mail code,.lt-mail font" +
+  "{color:#e8e8ee!important}" +
+  ".lt-mail .lt-muted,.lt-mail .lt-muted *{color:#a4a4ae!important}" +
+  ".lt-mail .lt-soft{background:#2b2b31!important}" +
+  ".lt-mail .lt-on{color:#ffffff!important}" +
+  "}";
 
 /** Convert Markdown to a styled, self-contained HTML email. */
 export function renderEmail(md: string, brand: Brand = DEFAULT_BRAND, signatureHtml?: string): string {
@@ -184,9 +199,10 @@ export function renderEmail(md: string, brand: Brand = DEFAULT_BRAND, signatureH
     : "";
   const fontLink = brand.fontUrl ? `<link href="${escapeHtml(brand.fontUrl)}" rel="stylesheet">` : "";
   return (
-    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">${fontLink}</head>` +
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">` +
+    `<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">${fontLink}<style>${DARK_CSS}</style></head>` +
     `<body style="margin:0;padding:0">` +
-    `<div style="max-width:640px;padding:8px 4px;font-family:${t.font};color:${t.text}">${inner}${sig}</div></body></html>`
+    `<div class="lt-mail" style="max-width:640px;padding:8px 4px;font-family:${t.font};color:${t.text}">${inner}${sig}</div></body></html>`
   );
 }
 

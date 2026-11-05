@@ -50,3 +50,11 @@ test("base64 round-trips binary", () => {
   const b = new Uint8Array(100000).map((_, i) => i % 256);
   assert.deepEqual(base64ToBytes(bytesToBase64(b)), b);
 });
+
+test("mail switches to light text in dark mode", () => {
+  const html = renderEmail("# Hi\n\nText\n\n`x`", { primary: "#231F47", accent: "#D8093A" });
+  assert.ok(html.includes('<meta name="color-scheme" content="light dark">'));
+  assert.ok(/@media \(prefers-color-scheme:dark\)\{[^}]*\.lt-mail p[^}]*\{color:#e8e8ee!important\}/.test(html));
+  assert.ok(html.includes('class="lt-mail"') && html.includes('class="lt-soft"'));
+  assert.equal(htmlToText(html), "Hi\n\nText\n\nx");
+});

@@ -70,6 +70,8 @@ export type EmailSummary = {
   threadId: string;
   unread: boolean;
   flagged: boolean;
+  /** Saved in Drafts and not sent yet. */
+  draft: boolean;
   labels: string[];
 };
 
@@ -223,6 +225,7 @@ export class JmapClient {
       threadId: e.threadId || "",
       unread: !e.keywords?.$seen,
       flagged: !!e.keywords?.$flagged,
+      draft: !!e.keywords?.$draft,
       labels: Object.keys(e.keywords || {}).filter((k) => !k.startsWith("$")),
     };
   }

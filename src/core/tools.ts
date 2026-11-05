@@ -18,6 +18,8 @@ export type ToolContext = {
   client(account?: string): JmapClient;
   /** Whether this connection may send. Drafts are always allowed. */
   canSend(): boolean;
+  /** Added to the refusal when sending is off, e.g. how the user can send it themselves. */
+  sendHint?: string;
   /** Set on servers with several mailboxes: adds an `account` parameter. */
   accounts?: () => Array<{ name: string; address: string }>;
   /** Local server only: read a file to attach. */
@@ -161,7 +163,10 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
 
   const requireSend = () => {
     if (!ctx.canSend()) {
-      throw new Error("Sending is not allowed on this connection. Save a draft instead, or re-authorise and allow sending.");
+      throw new Error(
+        ctx.sendHint ??
+          "Sending is not allowed on this connection. Save a draft instead, or re-authorise and allow sending.",
+      );
     }
   };
 
