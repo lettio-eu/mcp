@@ -3,7 +3,7 @@
   "name": "eu.lettio/mcp",
   "title": "Lettio MCP",
   "description": "Private, EU-hosted email for AI agents over JMAP: read, search, reply, draft, organize, send.",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "repository": {
     "url": "https://github.com/lettio-eu/mcp",
     "source": "github"
@@ -13,7 +13,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@lettio/mcp",
-      "version": "0.5.3",
+      "version": "0.5.4",
       "transport": {
         "type": "stdio"
       },
