@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { base64ToBytes, bytesToBase64, htmlToText, markdownToHtml, renderEmail } from "../src/core/format.js";
+import { base64ToBytes, bytesToBase64, darkLinkColor, htmlToText, markdownToHtml, renderEmail } from "../src/core/format.js";
 
 test("markdown becomes formatted html", () => {
   const html = markdownToHtml("# Hi\n\n**bold**\n\n- a\n- b\n\n| x |\n|---|\n| 1 |");
@@ -59,13 +59,23 @@ test("mail switches to light text in dark mode", () => {
   assert.equal(htmlToText(html), "Hi\n\nText\n\nx");
 });
 
-test("dark mode gives the light text its own dark ground", () => {
-  const html = renderEmail("Text", { primary: "#231F47", accent: "#D8093A" });
+test("dark mode darkens the whole canvas and lightens links to readable", () => {
+  const html = renderEmail("[site](https://lettio.eu)\n\nText", { primary: "#231F47", accent: "#005c3d" });
   const dark = html.slice(html.indexOf("@media (prefers-color-scheme:dark)"), html.indexOf("</style>"));
-  assert.ok(/\.lt-mail\{background:#1c1c20!important/.test(dark), dark);
+  assert.ok(dark.includes("html,body,.lt-mail{background:#1f1f22!important}"), dark);
+  assert.ok(!dark.includes("border-radius"), "no card look");
+  const link = darkLinkColor("#005c3d");
+  assert.ok(dark.includes(`.lt-mail a.lt-link{color:${link}!important}`));
+  assert.notEqual(link, "#005c3d");
+  assert.ok(html.includes('class="lt-link"'));
   // Outside the dark query the mail keeps no background of its own.
   const body = html.slice(html.indexOf("<body"));
   assert.ok(!/class="lt-mail" style="[^"]*background/.test(body));
+});
+
+test("darkLinkColor keeps an already light accent and falls back for bad input", () => {
+  assert.equal(darkLinkColor("#9ecbff"), "#9ecbff");
+  assert.equal(darkLinkColor("not-a-colour"), "#9ecbff");
 });
 
 test("text carries no colour unless the brand sets one", () => {

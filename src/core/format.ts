@@ -100,10 +100,10 @@ function emailMarked(b: Brand): Marked {
             "8px 0 22px",
           ).replace('width="100%" ', "")}<p style="${P}">`;
         }
-        return `<a href="${url}" style="color:${t.accent};font-weight:600;text-decoration:underline">${label}</a>`;
+        return `<a class="lt-link" href="${url}" style="color:${t.accent};font-weight:600;text-decoration:underline">${label}</a>`;
       },
       image({ href, text }) {
-        return SAFE_LINK.test(href) ? `<a href="${escapeHtml(href)}" style="color:${t.accent}">${escapeHtml(text || href)}</a>` : escapeHtml(text);
+        return SAFE_LINK.test(href) ? `<a class="lt-link" href="${escapeHtml(href)}" style="color:${t.accent}">${escapeHtml(text || href)}</a>` : escapeHtml(text);
       },
       codespan({ text }) {
         return `<code class="lt-soft" style="padding:1px 5px;${t.tint};border-radius:4px;font-family:Menlo,Consolas,monospace;font-size:13px;${t.ink}">${text}</code>`;
@@ -185,18 +185,52 @@ export function textSignatureToHtml(sig: string, brand: Brand = DEFAULT_BRAND): 
  * clients that read media queries (Apple Mail when reading, Outlook for Mac
  * and mobile, Thunderbird). A mail app's editor ignores it.
  */
-const DARK_CSS =
-  "@media (prefers-color-scheme:dark){" +
-  // Some readers (Spark) keep a white canvas in dark mode while honouring this
-  // query, so the light text needs its own dark ground.
-  ".lt-mail{background:#1c1c20!important;border-radius:8px;padding:12px 14px!important}" +
-  ".lt-mail,.lt-mail p,.lt-mail div,.lt-mail span,.lt-mail td,.lt-mail th,.lt-mail li,.lt-mail ul,.lt-mail ol," +
-  ".lt-mail h1,.lt-mail h2,.lt-mail h3,.lt-mail h4,.lt-mail h5,.lt-mail h6,.lt-mail strong,.lt-mail b,.lt-mail em,.lt-mail code,.lt-mail font" +
-  "{color:#e8e8ee!important}" +
-  ".lt-mail .lt-muted,.lt-mail .lt-muted *{color:#a4a4ae!important}" +
-  ".lt-mail .lt-soft{background:#2b2b31!important}" +
-  ".lt-mail .lt-on{color:#ffffff!important}" +
-  "}";
+/** Dark-mode background: the whole mail canvas, so no white frame is left around it. */
+const DARK_BG = "#1f1f22";
+
+function luminance(hex: string): number {
+  const v = hex.replace("#", "");
+  const full = v.length === 3 ? v.split("").map((c) => c + c).join("") : v;
+  const ch = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16) / 255);
+  const lin = ch.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * lin[0]! + 0.7152 * lin[1]! + 0.0722 * lin[2]!;
+}
+
+/** The brand accent mixed toward white until it reads on the dark background (4.5:1). */
+export function darkLinkColor(accent: string): string {
+  if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(accent)) return "#9ecbff";
+  const bg = luminance(DARK_BG);
+  const v = accent.replace("#", "");
+  const full = v.length === 3 ? v.split("").map((c) => c + c).join("") : v;
+  const rgb = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
+  for (let step = 0; step <= 20; step++) {
+    const mix = rgb.map((c) => Math.round(c + ((255 - c) * step) / 20));
+    const hex = "#" + mix.map((c) => c.toString(16).padStart(2, "0")).join("");
+    if ((luminance(hex) + 0.05) / (bg + 0.05) >= 4.5) return hex;
+  }
+  return "#ffffff";
+}
+
+/**
+ * Dark-mode rules. Some readers (Spark) keep a white canvas while honouring
+ * prefers-color-scheme:dark, so the canvas itself turns dark too; the forced
+ * light text then always sits on a dark ground. Mail editors ignore <style>,
+ * where text simply has no colour and follows the app.
+ */
+function darkCss(accent: string): string {
+  return (
+    "@media (prefers-color-scheme:dark){" +
+    `html,body,.lt-mail{background:${DARK_BG}!important}` +
+    ".lt-mail,.lt-mail p,.lt-mail div,.lt-mail span,.lt-mail td,.lt-mail th,.lt-mail li,.lt-mail ul,.lt-mail ol," +
+    ".lt-mail h1,.lt-mail h2,.lt-mail h3,.lt-mail h4,.lt-mail h5,.lt-mail h6,.lt-mail strong,.lt-mail b,.lt-mail em,.lt-mail code,.lt-mail font" +
+    "{color:#e8e8ee!important}" +
+    `.lt-mail a.lt-link{color:${darkLinkColor(accent)}!important}` +
+    ".lt-mail .lt-muted,.lt-mail .lt-muted *{color:#a4a4ae!important}" +
+    ".lt-mail .lt-soft{background:#2b2b31!important}" +
+    ".lt-mail .lt-on{color:#ffffff!important}" +
+    "}"
+  );
+}
 
 /** Convert Markdown to a styled, self-contained HTML email. */
 export function renderEmail(md: string, brand: Brand = DEFAULT_BRAND, signatureHtml?: string): string {
@@ -209,7 +243,7 @@ export function renderEmail(md: string, brand: Brand = DEFAULT_BRAND, signatureH
   const fontLink = brand.fontUrl ? `<link href="${escapeHtml(brand.fontUrl)}" rel="stylesheet">` : "";
   return (
     `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">` +
-    `${fontLink}<style>${DARK_CSS}</style></head>` +
+    `${fontLink}<style>${darkCss(t.accent)}</style></head>` +
     `<body style="margin:0;padding:0">` +
     `<div class="lt-mail" style="max-width:640px;padding:8px 4px;font-family:${t.font};${t.ink}">${inner}${sig}</div></body></html>`
   );
