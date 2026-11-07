@@ -53,9 +53,19 @@ test("base64 round-trips binary", () => {
 
 test("mail switches to light text in dark mode", () => {
   const html = renderEmail("# Hi\n\nText\n\n`x`", { primary: "#231F47", accent: "#D8093A" });
-  assert.ok(/@media \(prefers-color-scheme:dark\)\{[^}]*\.lt-mail p[^}]*\{color:#e8e8ee!important\}/.test(html));
+  assert.ok(html.includes("@media (prefers-color-scheme:dark){"));
+  assert.ok(/\.lt-mail p[^}]*\{color:#e8e8ee!important\}/.test(html));
   assert.ok(html.includes('class="lt-mail"') && html.includes('class="lt-soft"'));
   assert.equal(htmlToText(html), "Hi\n\nText\n\nx");
+});
+
+test("dark mode gives the light text its own dark ground", () => {
+  const html = renderEmail("Text", { primary: "#231F47", accent: "#D8093A" });
+  const dark = html.slice(html.indexOf("@media (prefers-color-scheme:dark)"), html.indexOf("</style>"));
+  assert.ok(/\.lt-mail\{background:#1c1c20!important/.test(dark), dark);
+  // Outside the dark query the mail keeps no background of its own.
+  const body = html.slice(html.indexOf("<body"));
+  assert.ok(!/class="lt-mail" style="[^"]*background/.test(body));
 });
 
 test("text carries no colour unless the brand sets one", () => {

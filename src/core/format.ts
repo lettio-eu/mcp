@@ -187,6 +187,9 @@ export function textSignatureToHtml(sig: string, brand: Brand = DEFAULT_BRAND): 
  */
 const DARK_CSS =
   "@media (prefers-color-scheme:dark){" +
+  // Some readers (Spark) keep a white canvas in dark mode while honouring this
+  // query, so the light text needs its own dark ground.
+  ".lt-mail{background:#1c1c20!important;border-radius:8px;padding:12px 14px!important}" +
   ".lt-mail,.lt-mail p,.lt-mail div,.lt-mail span,.lt-mail td,.lt-mail th,.lt-mail li,.lt-mail ul,.lt-mail ol," +
   ".lt-mail h1,.lt-mail h2,.lt-mail h3,.lt-mail h4,.lt-mail h5,.lt-mail h6,.lt-mail strong,.lt-mail b,.lt-mail em,.lt-mail code,.lt-mail font" +
   "{color:#e8e8ee!important}" +
