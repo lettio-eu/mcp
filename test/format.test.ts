@@ -59,10 +59,12 @@ test("mail switches to light text in dark mode", () => {
   assert.equal(htmlToText(html), "Hi\n\nText\n\nx");
 });
 
-test("dark mode darkens the whole canvas and lightens links to readable", () => {
+test("mail declares dark-mode support and lightens links to readable", () => {
   const html = renderEmail("[site](https://lettio.eu)\n\nText", { primary: "#231F47", accent: "#005c3d" });
   const dark = html.slice(html.indexOf("@media (prefers-color-scheme:dark)"), html.indexOf("</style>"));
-  assert.ok(dark.includes("html,body,.lt-mail{background:#1f1f22!important}"), dark);
+  assert.ok(html.includes('<meta name="color-scheme" content="light dark">'));
+  assert.ok(html.includes(":root{color-scheme:light dark"));
+  assert.ok(!dark.includes("background:#1f1f22"), "the reader draws its own dark canvas");
   assert.ok(!dark.includes("border-radius"), "no card look");
   const link = darkLinkColor("#005c3d");
   assert.ok(dark.includes(`.lt-mail a.lt-link{color:${link}!important}`));

@@ -185,7 +185,7 @@ export function textSignatureToHtml(sig: string, brand: Brand = DEFAULT_BRAND): 
  * clients that read media queries (Apple Mail when reading, Outlook for Mac
  * and mobile, Thunderbird). A mail app's editor ignores it.
  */
-/** Dark-mode background: the whole mail canvas, so no white frame is left around it. */
+/** A typical dark canvas, used only to pick a readable link colour for dark mode. */
 const DARK_BG = "#1f1f22";
 
 function luminance(hex: string): number {
@@ -220,7 +220,6 @@ export function darkLinkColor(accent: string): string {
 function darkCss(accent: string): string {
   return (
     "@media (prefers-color-scheme:dark){" +
-    `html,body,.lt-mail{background:${DARK_BG}!important}` +
     ".lt-mail,.lt-mail p,.lt-mail div,.lt-mail span,.lt-mail td,.lt-mail th,.lt-mail li,.lt-mail ul,.lt-mail ol," +
     ".lt-mail h1,.lt-mail h2,.lt-mail h3,.lt-mail h4,.lt-mail h5,.lt-mail h6,.lt-mail strong,.lt-mail b,.lt-mail em,.lt-mail code,.lt-mail font" +
     "{color:#e8e8ee!important}" +
@@ -243,7 +242,11 @@ export function renderEmail(md: string, brand: Brand = DEFAULT_BRAND, signatureH
   const fontLink = brand.fontUrl ? `<link href="${escapeHtml(brand.fontUrl)}" rel="stylesheet">` : "";
   return (
     `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">` +
-    `${fontLink}<style>${darkCss(t.accent)}</style></head>` +
+    // Declares that the mail handles dark mode itself, so readers such as
+    // Spark and Apple Mail draw it on their own dark canvas instead of a white
+    // sheet, and do not invert it.
+    `<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">` +
+    `${fontLink}<style>:root{color-scheme:light dark;supported-color-schemes:light dark}${darkCss(t.accent)}</style></head>` +
     `<body style="margin:0;padding:0">` +
     `<div class="lt-mail" style="max-width:640px;padding:8px 4px;font-family:${t.font};${t.ink}">${inner}${sig}</div></body></html>`
   );
