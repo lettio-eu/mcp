@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { base64ToBytes, bytesToBase64, darkLinkColor, htmlToText, markdownToHtml, renderEmail } from "../src/core/format.js";
+import { PANEL_FONTS, brandFromPanel } from "../src/core/index.js";
 
 test("markdown becomes formatted html", () => {
   const html = markdownToHtml("# Hi\n\n**bold**\n\n- a\n- b\n\n| x |\n|---|\n| 1 |");
@@ -85,4 +86,47 @@ test("text carries no colour unless the brand sets one", () => {
   const body = html.slice(html.indexOf("<body"));
   assert.ok(!/[^-]color:#(?!ffffff)/i.test(body.replace(/color:#D8093A/g, "")), body);
   assert.ok(renderEmail("Text", { primary: "#000", accent: "#111", text: "#222" }).includes("color:#222;"));
+});
+
+const BRAND = { primary: "#00875a", accent: "#005c3d" };
+
+test("logo header appears for an https url, before the text", () => {
+  const html = renderEmail("Hello", { ...BRAND, logoUrl: "https://cdn.example.eu/logo.png", logoAlt: "Acme" });
+  const img = '<img src="https://cdn.example.eu/logo.png" alt="Acme" height="40" style="display:block;height:40px;width:auto;border:0;margin:0 0 18px">';
+  assert.ok(html.includes(img), html);
+  assert.ok(html.indexOf("<img") < html.indexOf("Hello"));
+});
+
+test("logo is omitted for http, javascript and data urls, or when unset", () => {
+  for (const logoUrl of ["http://cdn.example.eu/logo.png", "javascript:alert(1)", "data:image/png;base64,AAAA", undefined]) {
+    assert.ok(!renderEmail("Hello", { ...BRAND, logoUrl }).includes("<img"), String(logoUrl));
+  }
+});
+
+test("logo alt and src are escaped, alt defaults to empty", () => {
+  const html = renderEmail("Hi", { ...BRAND, logoUrl: 'https://a.eu/l.png?x="1"&y=<2>', logoAlt: 'A"><script>x</script>' });
+  assert.ok(!html.includes("<script"));
+  assert.ok(html.includes('alt="A&quot;&gt;&lt;script&gt;x&lt;/script&gt;"'));
+  assert.ok(html.includes('src="https://a.eu/l.png?x=&quot;1&quot;&amp;y=&lt;2&gt;"'));
+  assert.ok(renderEmail("Hi", { ...BRAND, logoUrl: "https://a.eu/l.png" }).includes('alt=""'));
+});
+
+test("brandFromPanel maps every font id", () => {
+  for (const [id, font] of Object.entries(PANEL_FONTS)) {
+    const b = brandFromPanel({ primaryColor: "#111111", accentColor: "#222222", font: id as keyof typeof PANEL_FONTS });
+    assert.equal(b.primary, "#111111");
+    assert.equal(b.accent, "#222222");
+    assert.equal(b.font, font.stack);
+    assert.equal(b.fontUrl, font.url);
+    assert.ok(!b.font!.includes('"'), id);
+  }
+  assert.deepEqual(Object.keys(PANEL_FONTS), ["system", "inter", "lexend", "roboto", "open-sans", "source-sans-3", "georgia"]);
+});
+
+test("brandFromPanel passes the logo through and drops an empty one", () => {
+  const b = brandFromPanel({ primaryColor: "#111111", accentColor: "#222222", font: "inter", logoUrl: "https://a.eu/l.png", logoAlt: "A" });
+  assert.equal(b.logoUrl, "https://a.eu/l.png");
+  assert.equal(b.logoAlt, "A");
+  const n = brandFromPanel({ primaryColor: "#111111", accentColor: "#222222", font: "system", logoUrl: null });
+  assert.ok(!("logoUrl" in n) && !("fontUrl" in n));
 });

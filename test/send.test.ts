@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { JmapClient } from "../src/core/jmap.js";
+import { registerTools } from "../src/core/tools.js";
 
 const SELF = "me@example.eu";
 const realFetch = globalThis.fetch;
@@ -93,4 +94,50 @@ test("send_draft fails on full refusal and puts the draft back", async () => {
   await assert.rejects(c.sendDraft("d1"), /not sent.*Drafts/is);
   const restore = calls.find(([name, args]) => name === "Email/set" && args.update?.d1);
   assert.deepEqual(restore?.[1].update.d1, { mailboxIds: { mbD: true }, "keywords/$draft": true });
+});
+
+/** Registers the tools on a stub server and returns a caller for them. */
+function toolRunner(beforeSend?: () => Promise<void>) {
+  const handlers = new Map<string, (a: any) => Promise<any>>();
+  registerTools(
+    { tool: (name: string, _d: string, _s: unknown, _h: unknown, run: (a: any) => Promise<any>) => void handlers.set(name, run) },
+    { client: () => new JmapClient("https://mail.test", SELF, "pw"), canSend: () => true, beforeSend },
+  );
+  return (name: string, args: any) => handlers.get(name)!(args);
+}
+
+const isSend = ([name]: any[]) => name === "EmailSubmission/set";
+
+test("beforeSend throwing stops send_email and its message reaches the result", async () => {
+  const calls = fakeServer({ "nobody@example.eu": queued }, "pending");
+  const run = toolRunner(async () => {
+    throw new Error("Monthly limit reached.");
+  });
+  const r = await run("send_email", { to: ["nobody@example.eu"], subject: "Hi", body: "x" });
+  assert.equal(r.isError, true);
+  assert.match(r.content[0].text, /Monthly limit reached\./);
+  assert.ok(!calls.some(isSend));
+});
+
+test("beforeSend throwing stops reply_email and send_draft", async () => {
+  const calls = fakeServer({ "nobody@example.eu": queued }, "pending");
+  const run = toolRunner(async () => {
+    throw new Error("Not on this plan.");
+  });
+  for (const [name, args] of [["reply_email", { id: "m1", body: "x" }], ["send_draft", { id: "d1" }]] as const) {
+    const r = await run(name, args);
+    assert.equal(r.isError, true, name);
+    assert.match(r.content[0].text, /Not on this plan\./, name);
+  }
+  assert.ok(!calls.some(isSend));
+});
+
+test("beforeSend that resolves lets the send through, once", async () => {
+  const calls = fakeServer({ "nobody@example.eu": queued }, "pending");
+  let n = 0;
+  const run = toolRunner(async () => void n++);
+  const r = await run("send_email", { to: ["nobody@example.eu"], subject: "Hi", body: "x" });
+  assert.ok(!r.isError, r.content[0].text);
+  assert.equal(n, 1);
+  assert.ok(calls.some(isSend));
 });

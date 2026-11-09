@@ -5,3 +5,4 @@ export { DEFAULT_BRAND, renderEmail } from "./format.js";
 export type { Brand } from "./format.js";
 export { htmlToText, textSignatureToHtml } from "./format.js";
 export type { EmailFull, EmailSummary, SendResult } from "./jmap.js";
+export { PANEL_FONTS, brandFromPanel } from "./brand.js";

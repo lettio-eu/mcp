@@ -18,6 +18,11 @@ export type ToolContext = {
   client(account?: string): JmapClient;
   /** Whether this connection may send. Drafts are always allowed. */
   canSend(): boolean;
+  /**
+   * Runs right before every send, after the permission check. Throw an Error to
+   * stop the send; its message becomes the tool's error text.
+   */
+  beforeSend?: () => Promise<void>;
   /** Added to the refusal when sending is off, e.g. how the user can send it themselves. */
   sendHint?: string;
   /** Set on servers with several mailboxes: adds an `account` parameter. */
@@ -347,6 +352,7 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
       requireSend();
       const c = ctx.client(a.account);
       const atts = await resolveAttachments(c, a.attachments);
+      await ctx.beforeSend?.();
       const r = await c.send({ to: a.to, cc: a.cc, bcc: a.bcc, subject: a.subject, body: a.body, format: fmt(a.format), attachments: atts, signature: a.signature });
       return text(`Sent from ${c.address} to ${r.accepted.join(", ")}.${notDelivered(r)}`);
     },
@@ -361,6 +367,7 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
       requireSend();
       const c = ctx.client(a.account);
       const atts = await resolveAttachments(c, a.attachments);
+      await ctx.beforeSend?.();
       const r = await c.reply(a.id, { body: a.body, format: fmt(a.format), replyAll: a.reply_all, attachments: atts, signature: a.signature });
       return text(`Reply sent to ${r.accepted.join(", ")}.${notDelivered(r)}`);
     },
@@ -399,6 +406,7 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
     SEND,
     async (a) => {
       requireSend();
+      await ctx.beforeSend?.();
       const r = await ctx.client(a.account).sendDraft(a.id);
       return text(`Draft sent to ${r.accepted.join(", ")}.${notDelivered(r)}`);
     },

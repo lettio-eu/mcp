@@ -29,6 +29,10 @@ export type Brand = {
   font?: string;
   /** Optional web font stylesheet, e.g. a Google Fonts URL. */
   fontUrl?: string;
+  /** Logo shown at the top of the mail. Only an https: URL is used. */
+  logoUrl?: string;
+  /** Alt text for the logo. Empty when not given. */
+  logoAlt?: string;
 };
 
 /** Used when a domain has no brand of its own. */
@@ -239,6 +243,10 @@ export function renderEmail(md: string, brand: Brand = DEFAULT_BRAND, signatureH
   const sig = signatureHtml
     ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:26px;border-collapse:collapse"><tr><td style="${hairline("border-top", t.line)};padding-top:16px">${signatureHtml}</td></tr></table>`
     : "";
+  const logo =
+    brand.logoUrl && /^https:\/\//i.test(brand.logoUrl)
+      ? `<img src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.logoAlt ?? "")}" height="40" style="display:block;height:40px;width:auto;border:0;margin:0 0 18px">`
+      : "";
   const fontLink = brand.fontUrl ? `<link href="${escapeHtml(brand.fontUrl)}" rel="stylesheet">` : "";
   return (
     `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">` +
@@ -248,7 +256,7 @@ export function renderEmail(md: string, brand: Brand = DEFAULT_BRAND, signatureH
     `<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">` +
     `${fontLink}<style>:root{color-scheme:light dark;supported-color-schemes:light dark}${darkCss(t.accent)}</style></head>` +
     `<body style="margin:0;padding:0">` +
-    `<div class="lt-mail" style="max-width:640px;padding:8px 4px;font-family:${t.font};${t.ink}">${inner}${sig}</div></body></html>`
+    `<div class="lt-mail" style="max-width:640px;padding:8px 4px;font-family:${t.font};${t.ink}">${logo}${inner}${sig}</div></body></html>`
   );
 }
 
