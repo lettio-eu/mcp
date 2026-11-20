@@ -31,6 +31,15 @@ export type ToolContext = {
   readFile?: (path: string) => Promise<{ name: string; bytes: Uint8Array; type?: string }>;
   /** Local server only: save an attachment to disk. */
   writeFile?: (path: string, bytes: Uint8Array) => Promise<void>;
+  /**
+   * Hosted server only: out-of-band uploads, so a local file can be attached
+   * without its bytes passing through the model. Adds `prepare_upload` and the
+   * `upload_id` attachment source. Both are bound to the mailbox address.
+   */
+  uploads?: {
+    prepare(owner: string, name: string, type?: string): Promise<{ id: string; url: string; expiresAt: string; maxBytes: number }>;
+    take(owner: string, id: string): Promise<{ name: string; type?: string; bytes: Uint8Array }>;
+  };
 };
 
 type McpServerLike = { tool: (...args: any[]) => unknown };
@@ -133,12 +142,18 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
           type: z.string().optional().describe("MIME type, e.g. application/pdf."),
           content_base64: z.string().optional().describe("File content, base64 encoded."),
           ...(ctx.readFile ? { path: z.string().optional().describe("Path of a local file to attach.") } : {}),
+          ...(ctx.uploads ? { upload_id: z.string().optional().describe("A file uploaded through prepare_upload.") } : {}),
           from_email_id: z.string().optional().describe("Reuse an attachment from this email (with attachment_id)."),
           attachment_id: z.string().optional().describe("The attachment_id shown by read_email."),
         }),
       )
       .optional()
-      .describe("Files to attach. Give content_base64, or from_email_id with attachment_id."),
+      .describe(
+        ctx.uploads
+          ? "Files to attach. For a local file use prepare_upload and pass its upload_id; " +
+              "otherwise from_email_id with attachment_id, or content_base64 for small generated content."
+          : "Files to attach. Give content_base64, or from_email_id with attachment_id.",
+      ),
   };
   const compose = {
     body: z
@@ -185,11 +200,14 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
       } else if (a.content_base64) {
         if (!a.name) throw new Error("An attachment with content_base64 needs a name.");
         out.push({ name: a.name, type: a.type, bytes: base64ToBytes(a.content_base64) });
+      } else if (a.upload_id && ctx.uploads) {
+        const f = await ctx.uploads.take(client.address, a.upload_id);
+        out.push({ name: a.name || f.name, type: a.type || f.type, bytes: f.bytes });
       } else if (a.path && ctx.readFile) {
         const f = await ctx.readFile(a.path);
         out.push({ name: a.name || f.name, type: a.type || f.type, bytes: f.bytes });
       } else {
-        throw new Error("Each attachment needs content_base64, a path, or from_email_id with attachment_id.");
+        throw new Error("Each attachment needs content_base64, a path, an upload_id, or from_email_id with attachment_id.");
       }
     }
     return out;
@@ -341,6 +359,31 @@ export function registerTools(server: McpServerLike, ctx: ToolContext): void {
       };
     },
   );
+
+  if (ctx.uploads) {
+    tool(
+      "prepare_upload",
+      "Get a one-time URL for uploading a local file, so it can be attached without passing its content through the conversation. " +
+        "Upload with the curl command it returns, then pass upload_id in the attachments of send_email, reply_email, create_draft or create_reply_draft. " +
+        "The URL takes one upload within 15 minutes; the file stays usable for an hour.",
+      {
+        name: z.string().min(1).max(255).describe("File name the recipient sees, e.g. invoice.pdf."),
+        type: z.string().optional().describe("MIME type, e.g. application/pdf. Guessed from the name when left out."),
+        ...account,
+      },
+      WRITE,
+      async (a) => {
+        const c = ctx.client(a.account);
+        const u = await ctx.uploads!.prepare(c.address, a.name, a.type);
+        return text(
+          `upload_id: ${u.id}\n` +
+            `Upload (expires ${u.expiresAt}, max ${size(u.maxBytes)}):\n` +
+            `curl -sS --fail-with-body -T '<local file>' '${u.url}'\n` +
+            `Then attach it with {"upload_id": "${u.id}"}.`,
+        );
+      },
+    );
+  }
 
   tool(
     "send_email",
